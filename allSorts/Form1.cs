@@ -25,13 +25,24 @@ namespace allSorts
 		int comparisons = 0;
 		int arrayAccesses = 0;
 		StringFormat sf = new StringFormat() { Alignment = StringAlignment.Center };
+		Thread t;
 
 		public Form1()
 		{
 			InitializeComponent();
 			Load += Form1_Load;
 		}
-
+		/*
+		protected override CreateParams CreateParams
+		{
+			get
+			{
+				CreateParams cp = base.CreateParams;
+				cp.ExStyle |= 0x02000000;  // Turn on WS_EX_COMPOSITED
+				return cp;
+			}
+		}
+		*/
 		private void Form1_Load(object sender, EventArgs e)
 		{
 			comboBox1.SelectedIndex = 0;
@@ -106,27 +117,44 @@ namespace allSorts
 
 		private void button1_Click(object sender, EventArgs e)
 		{
-			arrayAccesses = comparisons = 0;
-			Random r0 = new Random();
-			List<item> lst = new List<item>();
-			
-			int min = 0;
-			for (int i = 0; i < 20; i++)
+			if (t == null)
 			{
-				min = new Random(((int)((float)Environment.TickCount / Math.PI) * r0.Next())).Next(min, min + 255);
-				lst.Add(new item() { key = i + 1, number = min });
-				Thread.Sleep(10);
+				arrayAccesses = comparisons = 0;
+				Random r0 = new Random();
+				List<item> lst = new List<item>();
+
+				int min = 0;
+				for (int i = 0; i < 20; i++)
+				{
+					min = new Random(((int)((float)Environment.TickCount / Math.PI) * r0.Next())).Next(min, min + 255);
+					lst.Add(new item() { key = i + 1, number = min });
+					Thread.Sleep(10);
+				}
+				lst2 = lst.ToArray();
+				intArray = lst2.Select(x => x.number).ToArray();
+
+				for (int n = 0; n < 5; n++)
+				{
+					shuffle(lst2);
+				}
+				
+				arrayType = comboBox1.SelectedIndex;
+
+				button1.Text = "STOP";
+
+				t = new Thread(
+					() => bubbleSort(intArray)
+				);
+				t.Start();
 			}
-			lst2 = lst.ToArray();
-			shuffle(lst2);
-			intArray = lst2.Select(x => x.number).ToArray();
+			else
+			{
+				t.Join(1000);
+				t.Abort();
+				t = null;
 
-			arrayType = comboBox1.SelectedIndex;
-
-			Thread t = new Thread(
-				() => bubbleSort(intArray)
-			);
-			t.Start();
+				button1.Text = "Start";
+			}
 
 		}
 
@@ -141,22 +169,26 @@ namespace allSorts
 				arr[i] = arr[r];
 				arr[r] = v1;
 				i--;
+				intArray = lst2.Select(x => x.number).ToArray();
+				this.Invoke(new myDelegate(writeToScreen));
 			}
 		}
 
 		public delegate void myDelegate();
 		public void writeToScreen()
 		{
-			int ii = 0;
-			using (Graphics g = CreateGraphics())
-			{
-				g.Clear(Color.AliceBlue);
-				
+			Image bmp = new Bitmap(Bounds.Width, Bounds.Height);
 
+			int ii = 0;
+			using (Graphics g = Graphics.FromImage(bmp))
+			{
 				Color c = Color.Black;
+				g.Clear(Color.AliceBlue);
 				foreach (int i in intArray)
 				{
+
 					c = Color.Black;
+
 
 					if (i == from)
 					{
@@ -172,12 +204,17 @@ namespace allSorts
 
 					g.FillRectangle(Brushes.ForestGreen, new Rectangle(new Point(30 + (ii * 30) - 6, 65), new Size(13, it.key * 10)));
 
-					g.DrawString("Array accesses: " +	arrayAccesses,	this.Font, Brushes.Black, new Point(50, 300));
-					g.DrawString("Comparisons: " +		comparisons,	this.Font, Brushes.Black, new Point(50, 330));
+					g.DrawString("Array accesses: " + arrayAccesses, this.Font, Brushes.Black, new Point(50, 300));
+					g.DrawString("Comparisons: " + comparisons, this.Font, Brushes.Black, new Point(50, 330));
 
 					g.Flush();
 
 					ii++;
+				}
+
+				using (Graphics gg = CreateGraphics())
+				{
+					gg.DrawImage(bmp, new Point(0, 0));
 				}
 			}
 		}
@@ -187,6 +224,22 @@ namespace allSorts
 			arrayLength = tb_End.Value;
 			label2.Text = arrayLength + "";
 		}
+
+		private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+		{
+			try
+			{
+				t.Join(300);
+				t.Abort();
+				t = null;
+			}
+			catch
+			{
+				e.Cancel = true;
+			}
+
+			if(t != null) { e.Cancel = true; }
+		}
 	}
 
 	public struct item
@@ -194,28 +247,6 @@ namespace allSorts
 		public int key;
 		public int number;
 	}
-
-	public class myPanel : Panel
-	{
-		public myPanel()
-		{
-			DoubleBuffered = true;
-			SetStyle(ControlStyles.AllPaintingInWmPaint, true);
-			SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
-			UpdateStyles();
-		}
-		
-		protected override CreateParams CreateParams
-		{
-			get
-			{
-				CreateParams cp = base.CreateParams;
-				cp.ExStyle |= 0x02000000;  // Turn on WS_EX_COMPOSITED
-				return cp;
-			}
-		}
-		
-
-	}
+	
 
 }
